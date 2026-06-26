@@ -12,6 +12,12 @@ namespace Dystopia.Progression
         // ── Events ────────────────────────────────────────────────────────
         public event Action<CardInstance, int> OnTierUpgrade;  // card, newTier
 
+        // ── Last-operation costs (read by CollectionBootstrapper for spend-after-save) ──
+        public int       LastGoldCost  { get; private set; }
+        public int       LastFragCost  { get; private set; }
+        public int       LastMatsCost  { get; private set; }
+        public CardClass LastCardClass { get; private set; }
+
         // ── Constructor ───────────────────────────────────────────────────
         public TierManager(WalletService wallet)
         {
@@ -55,8 +61,13 @@ namespace Dystopia.Progression
             int gold      = GoldCost(tier);
             int materials = MaterialCost(tier);
 
-            if (!_wallet.TrySpendTierUpgrade(gold, fragments, card.data.cardClass, materials))
+            if (!_wallet.CanAffordTierUpgrade(gold, fragments, card.data.cardClass, materials))
                 return false;
+
+            LastGoldCost  = gold;
+            LastFragCost  = fragments;
+            LastMatsCost  = materials;
+            LastCardClass = card.data.cardClass;
 
             card.TierUpgrade();
             OnTierUpgrade?.Invoke(card, card.CurrentTier);

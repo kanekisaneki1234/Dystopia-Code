@@ -276,7 +276,7 @@ namespace Dystopia.Battle
 
                     // Verify mana at resolution time (player could afford at selection
                     // time, but a passive/tick might have changed mana since then)
-                    int cost = Mathf.RoundToInt(ability.manaCost * card.ManaCostMultiplier);
+                    int cost = Mathf.RoundToInt(ability.ManaCost * card.ManaCostMultiplier);
                     if (CurrentMana >= cost)
                     {
                         // Advance pointer to the slot AFTER the override
@@ -320,7 +320,7 @@ namespace Dystopia.Battle
             var card = activeCards[_nextAbilitySlot];
 
             int cost = Mathf.RoundToInt(
-                card.data.ability.manaCost * card.ManaCostMultiplier);
+                card.data.ability.ManaCost * card.ManaCostMultiplier);
 
             if (CurrentMana < cost) return null;
 
@@ -342,7 +342,7 @@ namespace Dystopia.Battle
             var result = new List<CardInstance>();
             foreach (var card in Cards)
             {
-                if (card.data.ability != null && card.data.ability.kind == AbilityKind.Active)
+                if (card.data.ability != null && card.data.ability.Kind == AbilityKind.Active)
                     result.Add(card);
             }
             return result;
@@ -353,7 +353,7 @@ namespace Dystopia.Battle
         {
             return Cards.Where(c =>
                 c.data.ability != null &&
-                c.data.ability.kind == AbilityKind.Passive).ToList();
+                c.data.ability.Kind == AbilityKind.Passive).ToList();
         }
     }
 }

@@ -13,6 +13,12 @@ namespace Dystopia.Progression
         // ── Events ────────────────────────────────────────────────────────
         public event Action<CardInstance, ResonanceLevel> OnResonanceUp;
 
+        // ── Last-operation costs (read by CollectionBootstrapper for spend-after-save) ──
+        public int            LastGoldCost          { get; private set; }
+        public int            LastFragCost          { get; private set; }
+        public int            LastDupesConsumed     { get; private set; }
+        public ResonanceLevel LastPreviousResonance { get; private set; }
+
         // ── Constructor ───────────────────────────────────────────────────
         public ResonanceManager(WalletService wallet, CollectionService collection)
         {
@@ -98,13 +104,14 @@ namespace Dystopia.Progression
             // Check duplicates first
             if (card.duplicateCount < dupsNeeded) return false;
 
-            // Check currencies (atomic — both or neither)
-            if (!_wallet.TrySpend(goldNeeded, fragmentsNeeded)) return false;
+            if (!_wallet.CanAfford(goldNeeded, fragmentsNeeded)) return false;
 
-            // Consume duplicates
+            LastGoldCost          = goldNeeded;
+            LastFragCost          = fragmentsNeeded;
+            LastDupesConsumed     = dupsNeeded;
+            LastPreviousResonance = card.resonanceLevel;
+
             card.duplicateCount -= dupsNeeded;
-
-            // Apply resonance
             card.SetResonance(target);
             OnResonanceUp?.Invoke(card, target);
             return true;

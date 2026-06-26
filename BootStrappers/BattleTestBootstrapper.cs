@@ -3,7 +3,8 @@ using UnityEngine;
 using Dystopia.Battle;
 using Dystopia.Cards;
 using Dystopia.Core;
-using Dystopia.UI;
+using Dystopia.Economy.Services;
+using Dystopia.Networking;
 
 namespace Dystopia.UI
 {
@@ -22,10 +23,13 @@ namespace Dystopia.UI
         [Header("UI")]
         public BattleUIController  ui;
         public AbilitySelectionUI  abilitySelectionUI;
+        public BattleResultPanel   resultPanel;
 
-        // ── Accessible by ability selection UI ────────────────────────
-        public BattleTeam PlayerTeam  { get; private set; }
-        public BattleTeam OpponentTeam { get; private set; }
+        // ── Accessible by ability selection UI and result panel ───────
+        public BattleTeam         PlayerTeam  { get; private set; }
+        public BattleTeam         OpponentTeam { get; private set; }
+        public CloudScriptService CloudSvc    { get; private set; }
+        public WalletService      Wallet      { get; private set; }
 
         private void MaxOutCard(CardInstance card)
         {
@@ -42,16 +46,43 @@ namespace Dystopia.UI
 
         private void Start()
         {
-            PlayerTeam = new BattleTeam
+            bool testMode = GameSession.IsTestBattle;
+            GameSession.IsTestBattle = false; // consume the flag
+
+            if (testMode && GameSession.ActiveDeck != null && GameSession.ActiveDeck.Count > 0)
             {
-                OwnerName = "Player",
-                Cards = new List<CardInstance>
+                // Create fresh copies from card data so the player's real instances are never modified
+                var cards = new List<CardInstance>();
+                foreach (var c in GameSession.ActiveDeck)
+                    cards.Add(new CardInstance(c.data));
+                foreach (var card in cards)
+                    MaxOutCard(card);
+                PlayerTeam = new BattleTeam { OwnerName = "Player", Cards = cards };
+            }
+            else if (GameSession.ActiveDeck != null && GameSession.ActiveDeck.Count > 0)
+            {
+                PlayerTeam = new BattleTeam
                 {
-                    new CardInstance(playerCard1),
-                    new CardInstance(playerCard2),
-                    new CardInstance(playerCard3)
-                }
-            };
+                    OwnerName = "Player",
+                    Cards     = new List<CardInstance>(GameSession.ActiveDeck)
+                };
+                // Real card progression — do NOT MaxOutCard
+            }
+            else
+            {
+                PlayerTeam = new BattleTeam
+                {
+                    OwnerName = "Player",
+                    Cards = new List<CardInstance>
+                    {
+                        new CardInstance(playerCard1),
+                        new CardInstance(playerCard2),
+                        new CardInstance(playerCard3)
+                    }
+                };
+                foreach (var card in PlayerTeam.Cards)
+                    MaxOutCard(card);
+            }
 
             OpponentTeam = new BattleTeam
             {
@@ -63,9 +94,6 @@ namespace Dystopia.UI
                     new CardInstance(opponentCard3)
                 }
             };
-
-            foreach (var card in PlayerTeam.Cards)
-                MaxOutCard(card);
             foreach (var card in OpponentTeam.Cards)
                 MaxOutCard(card);
 
@@ -94,6 +122,16 @@ namespace Dystopia.UI
                 () => OpponentTeam.CurrentHP,
                 () => OpponentTeam.CurrentMana,
                 PlayerTeam.MaxMana);
+
+            ui.PopulateTeamCards(PlayerTeam, OpponentTeam);
+
+            var net = NetworkBootstrapper.Instance;
+            if (net != null)
+            {
+                Wallet   = net.Wallet;
+                CloudSvc = net.CloudSvc;
+            }
+            resultPanel?.Initialise(CloudSvc, Wallet);
 
             var aiSelector = gameObject.AddComponent<AIAbilitySelector>();
             if (abilitySelectionUI != null)

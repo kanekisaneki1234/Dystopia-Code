@@ -1,15 +1,16 @@
 using UnityEngine;
 using Dystopia.Cards;
-using Dystopia.Core;
 using Dystopia.Economy.Data;
 using Dystopia.Economy.Services;
+using Dystopia.Networking;
 
 namespace Dystopia.UI
 {
     public class ShopTestBootstrapper : MonoBehaviour
     {
         [Header("Card Pool")]
-        public CardData[] allCards;
+        public CardData[]   allCards;
+        public CardDatabase cardDatabase;
 
         [Header("Pack Assets")]
         public PackData[] packs;
@@ -17,23 +18,27 @@ namespace Dystopia.UI
         [Header("UI")]
         public ShopTestUI ui;
 
-        [Header("Starting Resources")]
-        public int startingDiamonds = 10000;
-
         // ── Services (accessible by UI) ──────────────────────────────
-        public PlayerProfile     Profile    { get; private set; }
-        public WalletService     Wallet     { get; private set; }
-        public CollectionService Collection { get; private set; }
-        public PackService       PackSvc    { get; private set; }
+        public WalletService      Wallet     { get; private set; }
+        public CollectionService  Collection { get; private set; }
+        public CloudScriptService CloudSvc   { get; private set; }
+        public PackService        PackSvc    { get; private set; }
 
         private void Start()
         {
-            Profile    = new PlayerProfile();
-            Wallet     = new WalletService(Profile.Wallet);
-            Collection = new CollectionService(Profile.Collection);
-            PackSvc    = new PackService(Wallet, Collection, allCards);
+            var net = NetworkBootstrapper.Instance;
+            if (net == null)
+            {
+                Debug.LogError("[ShopTestBootstrapper] NetworkBootstrapper.Instance is null. Start from TitleScene.");
+                return;
+            }
 
-            Wallet.AddDiamonds(startingDiamonds);
+            Wallet     = net.Wallet;
+            Collection = net.Collection;
+            CloudSvc   = net.CloudSvc;
+
+            // PackService is shop-specific — takes allCards from this scene's serialized assets
+            PackSvc = new PackService(Wallet, Collection, allCards);
 
             // Subscribe to events
             PackSvc.OnNewCardUnlocked += card =>

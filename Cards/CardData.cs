@@ -8,6 +8,7 @@ namespace Dystopia.Cards
     public class CardData : ScriptableObject
     {
         [Header("Identity")]
+        public string    cardId;      // Stable unique key — matches PlayFab catalog ItemId. Never change after creation.
         public string    cardName;
         public CardRank  rank;
         public CardClass cardClass;

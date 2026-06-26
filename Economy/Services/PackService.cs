@@ -63,9 +63,7 @@ namespace Dystopia.Economy.Services
         // ── View today's contents (for UI) ────────────────────────────
         public List<CardData> GetDailyContents(PackData pack)
         {
-            return _dailyContents.TryGetValue(pack, out var contents)
-                ? contents
-                : null;
+            return _dailyContents.TryGetValue(pack, out var contents) ? contents : null;
         }
 
         // ── Check affordability ───────────────────────────────────────
@@ -74,39 +72,50 @@ namespace Dystopia.Economy.Services
             return _wallet.Diamonds >= pack.diamondCost;
         }
 
-        // ── Purchase pack (get everything shown) ──────────────────────
-        public List<CardInstance> TryBuyPack(PackData pack)
+        // ── Purchase pack ─────────────────────────────────────────────
+        // Cards are claimed sequentially to avoid hitting PlayFab Cloud Script rate limits.
+        public void TryBuyPack(PackData pack, Action<List<CardInstance>> onComplete)
         {
-            if (!_dailyContents.TryGetValue(pack, out var contents)) return null;
-            if (contents.Count == 0) return null;
-            if (!_wallet.TrySpendDiamonds(pack.diamondCost)) return null;
-
-            var results = new List<CardInstance>();
-
-            foreach (var cardData in contents)
-                results.Add(ClaimCard(cardData));
-
-            // Clear this pack's contents after purchase
-            _dailyContents.Remove(pack);
-
-            return results;
-        }
-
-        // ── Claim a single card (handles unlock vs duplicate) ─────────
-        private CardInstance ClaimCard(CardData cardData)
-        {
-            var existing = _collection.GetOwnedCard(cardData);
-
-            if (existing != null)
+            if (!_dailyContents.TryGetValue(pack, out var contents) || contents.Count == 0)
             {
-                existing.AddDuplicate();
-                OnDuplicateGained?.Invoke(existing);
-                return existing;
+                onComplete?.Invoke(null);
+                return;
+            }
+            if (!_wallet.TrySpendDiamonds(pack.diamondCost))
+            {
+                onComplete?.Invoke(null);
+                return;
             }
 
-            var newCard = _collection.AddCard(cardData);
-            OnNewCardUnlocked?.Invoke(newCard);
-            return newCard;
+            _dailyContents.Remove(pack);
+
+            var cards   = new List<CardData>(contents);
+            var results = new List<CardInstance>();
+            ClaimNext(cards, 0, results, onComplete);
+        }
+
+        private void ClaimNext(List<CardData> cards, int index,
+            List<CardInstance> results, Action<List<CardInstance>> onComplete)
+        {
+            if (index >= cards.Count)
+            {
+                onComplete?.Invoke(results);
+                return;
+            }
+
+            bool isNew = !_collection.OwnsCardOfType(cards[index]);
+
+            _collection.ClaimCard(cards[index], card =>
+            {
+                if (card != null)
+                {
+                    results.Add(card);
+                    if (isNew) OnNewCardUnlocked?.Invoke(card);
+                    else       OnDuplicateGained?.Invoke(card);
+                }
+
+                ClaimNext(cards, index + 1, results, onComplete);
+            });
         }
     }
 }

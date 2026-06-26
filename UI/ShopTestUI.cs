@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 using Dystopia.Cards;
 using Dystopia.Economy.Data;
@@ -27,12 +28,17 @@ namespace Dystopia.UI
         public Button buyButton;
         public Button closePreviewButton;
 
+        [Header("Navigation")]
+        public Button backButton;
+        public string mainMenuScene = "MainMenuScene";
+
         [Header("Log")]
         public TMP_Text logText;
         public ScrollRect logScrollRect;
 
         private ShopTestBootstrapper _boot;
         private PackData _selectedPack;
+        private bool     _purchaseInFlight;
         private string _log = "";
 
         public void Initialise(ShopTestBootstrapper boot)
@@ -42,8 +48,12 @@ namespace Dystopia.UI
             buyButton.onClick.AddListener(OnBuy);
             closePreviewButton.onClick.AddListener(ClosePreview);
             rerollButton.onClick.AddListener(OnReroll);
+            backButton?.onClick.AddListener(() => SceneManager.LoadScene(mainMenuScene));
 
             previewPanel.SetActive(false);
+
+            _boot.Wallet.OnCurrencyChanged += (_, __) => RefreshTopBar();
+            _boot.Collection.OnCardAdded   += _       => RefreshTopBar();
 
             CreatePackCards();
             RefreshTopBar();
@@ -132,34 +142,44 @@ namespace Dystopia.UI
         // ── Buy ──────────────────────────────────────────────────────
         private void OnBuy()
         {
-            if (_selectedPack == null) return;
+            if (_selectedPack == null || _purchaseInFlight) return;
 
-            var results = _boot.PackSvc.TryBuyPack(_selectedPack);
+            // Capture before any async work — _selectedPack may change while awaiting PlayFab
+            var pack = _selectedPack;
+            _purchaseInFlight      = true;
+            buyButton.interactable = false;
 
-            if (results == null)
+            _boot.PackSvc.TryBuyPack(pack, results =>
             {
-                Log("Purchase FAILED — not enough Diamonds");
-                return;
-            }
+                _purchaseInFlight      = false;
+                buyButton.interactable = true;
 
-            Log($"═══ Purchased {_selectedPack.packName} ═══");
+                if (results == null)
+                {
+                    Log("Purchase FAILED — not enough Diamonds");
+                    return;
+                }
 
-            var resultGroups = results
-                .GroupBy(c => c.data.cardName)
-                .OrderBy(g => g.Key);
+                Log($"═══ Purchased {pack.packName} ═══");
 
-            foreach (var group in resultGroups)
-            {
-                var card = group.First();
-                int count = group.Count();
-                Log($"  {card.data.cardName} [{card.data.rank}] x{count} → dupes: {card.duplicateCount}");
-            }
+                var resultGroups = results
+                    .Where(c => c?.data != null)
+                    .GroupBy(c => c.data.cardName)
+                    .OrderBy(g => g.Key);
 
-            Log($"Diamonds: {_boot.Wallet.Diamonds} | Collection: {_boot.Collection.CardCount} cards");
+                foreach (var group in resultGroups)
+                {
+                    var card  = group.First();
+                    int count = group.Count();
+                    Log($"  {card.data.cardName} [{card.data.rank}] x{count} → dupes: {card.duplicateCount}");
+                }
 
-            ClosePreview();
-            CreatePackCards();
-            RefreshTopBar();
+                Log($"Diamonds: {_boot.Wallet.Diamonds} | Collection: {_boot.Collection.CardCount} cards");
+
+                ClosePreview();
+                CreatePackCards();
+                RefreshTopBar();
+            });
         }
 
         // ── Reroll daily contents ────────────────────────────────────

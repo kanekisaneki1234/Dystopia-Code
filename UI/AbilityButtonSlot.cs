@@ -53,9 +53,9 @@ namespace Dystopia.UI
 
         public void SetAffordable(bool canAfford)
         {
-            _isAffordable        = canAfford;
-            _button.interactable = canAfford;
-            _canvasGroup.alpha   = canAfford ? 1f : 0.5f;
+            _isAffordable = canAfford;
+            if (_button)      _button.interactable = canAfford;
+            if (_canvasGroup) _canvasGroup.alpha   = canAfford ? 1f : 0.5f;
             UpdateBackground();
         }
 
@@ -74,7 +74,7 @@ namespace Dystopia.UI
 
         public void Lock()
         {
-            _button.interactable = false;
+            if (_button) _button.interactable = false;
         }
 
         private void UpdateBackground()

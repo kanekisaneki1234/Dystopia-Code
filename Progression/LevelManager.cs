@@ -12,6 +12,10 @@ namespace Dystopia.Progression
         // ── Events ────────────────────────────────────────────────────────
         public event Action<CardInstance, int> OnLevelUp;  // card, newLevel
 
+        // ── Last-operation costs (read by CollectionBootstrapper for spend-after-save) ──
+        public int LastGoldCost { get; private set; }
+        public int LastFragCost { get; private set; }
+
         // ── Constructor ───────────────────────────────────────────────────
         public LevelManager(WalletService wallet)
         {
@@ -29,7 +33,10 @@ namespace Dystopia.Progression
             int fragmentCost = card.data.FragmentCostForLevel(tier, level);
             int goldCost     = card.data.GoldCostForLevel(tier, level);
 
-            if (!_wallet.TrySpend(goldCost, fragmentCost)) return false;
+            if (!_wallet.CanAfford(goldCost, fragmentCost)) return false;
+
+            LastGoldCost = goldCost;
+            LastFragCost = fragmentCost;
 
             card.LevelUp();
             OnLevelUp?.Invoke(card, card.CurrentLevel);
@@ -37,17 +44,43 @@ namespace Dystopia.Progression
         }
 
         // ── Multiple level ups ────────────────────────────────────────────
+        // Phase 1: accumulate how many levels are affordable without spending.
+        // Phase 2: apply all LevelUp()s; CollectionBootstrapper spends after save.
         public int TryLevelUpBy(CardInstance card, int levels)
         {
-            int levelsGained = 0;
+            int cap = card.data.MaxLevelForTier(card.CurrentTier);
+
+            int totalGold = 0, totalFrags = 0, affordable = 0;
 
             for (int i = 0; i < levels; i++)
             {
-                if (!TryLevelUp(card)) break;
-                levelsGained++;
+                int lvl = card.CurrentLevel + i;
+                if (lvl >= cap) break;
+
+                int goldCost = card.data.GoldCostForLevel(card.CurrentTier, lvl);
+                int fragCost = card.data.FragmentCostForLevel(card.CurrentTier, lvl);
+
+                if (_wallet.Gold < totalGold + goldCost || _wallet.Fragments < totalFrags + fragCost)
+                    break;
+
+                totalGold += goldCost;
+                totalFrags += fragCost;
+                affordable++;
             }
 
-            return levelsGained;
+            if (affordable == 0) return 0;
+            if (!_wallet.CanAfford(totalGold, totalFrags)) return 0;
+
+            LastGoldCost = totalGold;
+            LastFragCost = totalFrags;
+
+            for (int i = 0; i < affordable; i++)
+            {
+                card.LevelUp();
+                OnLevelUp?.Invoke(card, card.CurrentLevel);
+            }
+
+            return affordable;
         }
 
         // ── Level to max within current tier ──────────────────────────────

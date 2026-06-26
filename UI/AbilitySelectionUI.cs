@@ -38,6 +38,12 @@ namespace Dystopia.UI
             SelectedSlot   = null;
             _active        = true;
 
+            // Must enable the panel BEFORE building buttons so that Unity calls
+            // Awake on instantiated slots immediately. If the panel is disabled,
+            // Awake is deferred until the hierarchy becomes active — meaning
+            // _button and _canvasGroup are null when RefreshAffordability runs.
+            if (_panelRoot) _panelRoot.SetActive(true);
+
             BuildButtons();
             RefreshAffordability();
             HighlightDefault();
@@ -55,8 +61,6 @@ namespace Dystopia.UI
                 _skipButton.onClick.AddListener(OnSkip);
                 _skipButton.gameObject.SetActive(true);
             }
-
-            _panelRoot?.SetActive(true);
         }
 
         public void ForceEnd()
@@ -65,7 +69,7 @@ namespace Dystopia.UI
             SelectedSlot = null;
             IsReady      = true;
             _active      = false;
-            _panelRoot?.SetActive(false);
+            if (_panelRoot) _panelRoot.SetActive(false);
         }
 
         // ── Frame update (timer + affordability refresh) ──────────────────
@@ -100,7 +104,7 @@ namespace Dystopia.UI
 
                 if (slot == null) { Destroy(go); continue; }
 
-                int    cost = Mathf.RoundToInt(card.data.ability.manaCost * card.ManaCostMultiplier);
+                int    cost = Mathf.RoundToInt(card.data.ability.ManaCost * card.ManaCostMultiplier);
                 string desc = card.data.ability.GetShortDescription(card);
 
                 slot.Configure(i, card.data.cardName, card.data.ability.abilityName, desc, cost);
@@ -115,7 +119,7 @@ namespace Dystopia.UI
             for (int i = 0; i < _slots.Count && i < activeCards.Count; i++)
             {
                 var card = activeCards[i];
-                int cost = Mathf.RoundToInt(card.data.ability.manaCost * card.ManaCostMultiplier);
+                int cost = Mathf.RoundToInt(card.data.ability.ManaCost * card.ManaCostMultiplier);
                 _slots[i].SetAffordable(_team.CurrentMana >= cost);
             }
         }
@@ -141,7 +145,7 @@ namespace Dystopia.UI
             }
 
             if (_skipButton) _skipButton.gameObject.SetActive(false);
-            _panelRoot?.SetActive(false);
+            if (_panelRoot) _panelRoot.SetActive(false);
             OnReady?.Invoke();
         }
 
@@ -153,7 +157,7 @@ namespace Dystopia.UI
 
             foreach (var s in _slots) s.Lock();
             if (_skipButton) _skipButton.gameObject.SetActive(false);
-            _panelRoot?.SetActive(false);
+            if (_panelRoot) _panelRoot.SetActive(false);
             OnReady?.Invoke();
         }
     }

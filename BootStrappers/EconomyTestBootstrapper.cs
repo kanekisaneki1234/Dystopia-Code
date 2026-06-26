@@ -1,8 +1,7 @@
 using UnityEngine;
 using Dystopia.Cards;
-using Dystopia.Core;
-using Dystopia.Economy.Data;
 using Dystopia.Economy.Services;
+using Dystopia.Networking;
 using Dystopia.Progression;
 
 namespace Dystopia.UI
@@ -10,42 +9,39 @@ namespace Dystopia.UI
     public class EconomyTestBootstrapper : MonoBehaviour
     {
         [Header("Card Asset")]
-        public CardData testCard;
+        public CardData     testCard;
+        public CardDatabase cardDatabase;
 
         [Header("UI")]
         public EconomyTestUI ui;
 
-        [Header("Starting Resources")]
-        public int startingGold      = 50000;
-        public int startingFragments = 5000;
-        public int startingMaterials = 20;
+        [Header("Test Card Setup")]
         public int startingDuplicates = 30;
 
         // ── Services and Managers (accessible by UI) ──────────────────
-        public PlayerProfile     Profile    { get; private set; }
-        public WalletService     Wallet     { get; private set; }
-        public CollectionService Collection { get; private set; }
-        public LevelManager      LevelMgr   { get; private set; }
-        public TierManager       TierMgr    { get; private set; }
-        public ResonanceManager  ResMgr     { get; private set; }
-        public CardInstance      ActiveCard { get; private set; }
+        public WalletService      Wallet     { get; private set; }
+        public CollectionService  Collection { get; private set; }
+        public LevelManager       LevelMgr   { get; private set; }
+        public TierManager        TierMgr    { get; private set; }
+        public ResonanceManager   ResMgr     { get; private set; }
+        public CloudScriptService CloudSvc   { get; private set; }
+        public CardInstance       ActiveCard { get; private set; }
 
         private void Start()
         {
-            // ── Create profile ───────────────────────────────────────
-            Profile = new PlayerProfile();
+            var net = NetworkBootstrapper.Instance;
+            if (net == null)
+            {
+                Debug.LogError("[EconomyTestBootstrapper] NetworkBootstrapper.Instance is null. Start from TitleScene.");
+                return;
+            }
 
-            // ── Wire services ────────────────────────────────────────
-            Wallet     = new WalletService(Profile.Wallet);
-            Collection = new CollectionService(Profile.Collection);
-            LevelMgr   = new LevelManager(Wallet);
-            TierMgr    = new TierManager(Wallet);
-            ResMgr     = new ResonanceManager(Wallet, Collection);
-
-            // ── Give starting resources ──────────────────────────────
-            Wallet.AddGold(startingGold);
-            Wallet.AddFragments(startingFragments);
-            Wallet.AddMaterial(testCard.cardClass, startingMaterials);
+            Wallet     = net.Wallet;
+            Collection = net.Collection;
+            CloudSvc   = net.CloudSvc;
+            LevelMgr   = net.LevelMgr;
+            TierMgr    = net.TierMgr;
+            ResMgr     = net.ResMgr;
 
             // ── Add card to collection ───────────────────────────────
             ActiveCard = Collection.AddCard(testCard);
@@ -66,6 +62,10 @@ namespace Dystopia.UI
 
             ResMgr.OnResonanceUp += (card, res) =>
                 Debug.Log($"[Resonance] {card.data.cardName} → {res}");
+
+            LevelMgr.OnLevelUp    += (card, _) => Collection.SaveCardState(card);
+            TierMgr.OnTierUpgrade += (card, _) => Collection.SaveCardState(card);
+            ResMgr.OnResonanceUp  += (card, _) => Collection.SaveCardState(card);
 
             // ── Initial UI refresh ───────────────────────────────────
             ui.Initialise(this);

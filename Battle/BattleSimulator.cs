@@ -73,7 +73,7 @@ namespace Dystopia.Battle
             if (abilityCard == null) return;
 
             int cost = Mathf.RoundToInt(
-                abilityCard.data.ability.manaCost * abilityCard.ManaCostMultiplier);
+                abilityCard.data.ability.ManaCost * abilityCard.ManaCostMultiplier);
 
             if (attacker.CurrentMana < cost) return;
 

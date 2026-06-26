@@ -1,7 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Dystopia.Core;
+using Dystopia.Battle;
+using Dystopia.Cards;
 using Dystopia.Events;
 
 namespace Dystopia.UI
@@ -19,8 +22,14 @@ namespace Dystopia.UI
         public TMP_Text opponentHPText;
 
         [Header("Battle Info")]
-        public TMP_Text turnText;
-        public TMP_Text battleLog;
+        public TMP_Text    turnText;
+        public TMP_Text    battleLog;
+        public ScrollRect  battleLogScrollRect;
+
+        [Header("Card Display")]
+        public GameObject cardSlotPrefab;
+        public Transform  playerCardContainer;
+        public Transform  opponentCardContainer;
 
         private int _playerMaxHP;
         private int _opponentMaxHP;
@@ -95,6 +104,24 @@ namespace Dystopia.UI
         {
         }
 
+        public void PopulateTeamCards(BattleTeam player, BattleTeam opponent)
+        {
+            SpawnCardSlots(player.Cards,   playerCardContainer);
+            SpawnCardSlots(opponent.Cards, opponentCardContainer);
+        }
+
+        private void SpawnCardSlots(List<CardInstance> cards, Transform container)
+        {
+            if (!cardSlotPrefab || !container) return;
+
+            foreach (var card in cards)
+            {
+                var go   = Instantiate(cardSlotPrefab, container);
+                var slot = go.GetComponent<CardSlotUI>();
+                if (slot) slot.Configure(card);
+            }
+        }
+
         public void SetTeamReferences(
             int playerMaxHP,   int opponentMaxHP,
             System.Func<int>   getPlayerHP,
@@ -130,6 +157,12 @@ namespace Dystopia.UI
         {
             Debug.Log($"[Battle] {message}");
             battleLog.text += message + "\n";
+
+            if (battleLogScrollRect)
+            {
+                Canvas.ForceUpdateCanvases();
+                battleLogScrollRect.verticalNormalizedPosition = 0f;
+            }
         }
     }
 }

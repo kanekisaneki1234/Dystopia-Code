@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Dystopia.Core;
+using Dystopia.Networking;
 
 namespace Dystopia.UI
 {
@@ -26,6 +27,9 @@ namespace Dystopia.UI
         public Button addFragmentsButton;
         public Button addDuplicatesButton;
 
+        [Header("Cloud Script")]
+        public Button grantTestResourcesButton;
+
         [Header("Log")]
         public TMP_Text logText;
         public ScrollRect logScrollRect;
@@ -45,6 +49,11 @@ namespace Dystopia.UI
             addGoldButton.onClick.AddListener(OnAddGold);
             addFragmentsButton.onClick.AddListener(OnAddFragments);
             addDuplicatesButton.onClick.AddListener(OnAddDuplicates);
+            if (grantTestResourcesButton != null)
+                grantTestResourcesButton.onClick.AddListener(OnGrantTestResources);
+
+            // Re-draw wallet whenever PlayFab sync (or any spend) fires a balance change
+            _boot.Wallet.OnCurrencyChanged += (_, __) => { RefreshWallet(); RefreshButtonStates(); };
 
             RefreshAll();
         }
@@ -121,16 +130,26 @@ namespace Dystopia.UI
 
         private void OnAddGold()
         {
-            _boot.Wallet.AddGold(10000);
-            Log("Added 10,000 Gold");
-            RefreshAll();
+            addGoldButton.interactable = false;
+            _boot.CloudSvc?.GrantCurrency("GD", 500,
+                ()  => { addGoldButton.interactable = true; Log("Granted 500 Gold"); },
+                err => { addGoldButton.interactable = true; Log($"Grant Gold failed: {err}"); });
         }
 
         private void OnAddFragments()
         {
-            _boot.Wallet.AddFragments(1000);
-            Log("Added 1,000 Fragments");
-            RefreshAll();
+            addFragmentsButton.interactable = false;
+            _boot.CloudSvc?.GrantCurrency("FR", 100,
+                ()  => { addFragmentsButton.interactable = true; Log("Granted 100 Fragments"); },
+                err => { addFragmentsButton.interactable = true; Log($"Grant Fragments failed: {err}"); });
+        }
+
+        private void OnGrantTestResources()
+        {
+            if (grantTestResourcesButton != null) grantTestResourcesButton.interactable = false;
+            _boot.CloudSvc?.GrantTestResources(
+                ()  => { if (grantTestResourcesButton != null) grantTestResourcesButton.interactable = true; Log("Test resources granted"); },
+                err => { if (grantTestResourcesButton != null) grantTestResourcesButton.interactable = true; Log($"Grant test resources failed: {err}"); });
         }
 
         private void OnAddDuplicates()

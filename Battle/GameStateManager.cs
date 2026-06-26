@@ -109,6 +109,7 @@ namespace Dystopia.Battle
                 case BattleState.Defeat:
                 case BattleState.Draw:
                     BattleEvents.OnBattleEnd?.Invoke(_state.ToString());
+                    BattleEvents.OnBattleEnded?.Invoke(BuildBattleResult());
                     break;
             }
         }
@@ -208,6 +209,44 @@ namespace Dystopia.Battle
             // Pause briefly so animations have time to play
             yield return new WaitForSeconds(1f);
             TransitionTo(BattleState.RoundEnd);
+        }
+
+        // ── Battle result builder ─────────────────────────────────────────
+        private BattleResult BuildBattleResult()
+        {
+            int pStats = _playerTeam.AggregateAttack + _playerTeam.AggregateDefence + _playerTeam.AggregateSpeed;
+            int oStats = _opponentTeam.AggregateAttack + _opponentTeam.AggregateDefence + _opponentTeam.AggregateSpeed;
+            float mult = Mathf.Clamp((float)oStats / Mathf.Max(1, pStats), 0.5f, 2.0f);
+
+            int gold, frags;
+            if (_state == BattleState.Victory)
+            {
+                gold  = Mathf.FloorToInt(100 * mult) + (_currentTurn * 5);
+                frags = Mathf.FloorToInt(20  * mult) + Mathf.FloorToInt(_currentTurn * 1.5f);
+            }
+            else if (_state == BattleState.Draw)
+            {
+                gold  = Mathf.FloorToInt(50 * mult) + (_currentTurn * 4);
+                frags = Mathf.FloorToInt(10 * mult) + _currentTurn;
+            }
+            else  // Defeat
+            {
+                gold  = Mathf.FloorToInt(25 * mult) + (_currentTurn * 3);
+                frags = Mathf.FloorToInt(5  * mult) + _currentTurn;
+            }
+
+            return new BattleResult
+            {
+                Outcome              = _state.ToString(),
+                PlayerTeam           = _playerTeam,
+                OpponentTeam         = _opponentTeam,
+                RoundsPlayed         = _currentTurn,
+                PlayerStatTotal      = pStats,
+                OpponentStatTotal    = oStats,
+                DifficultyMultiplier = mult,
+                GoldReward           = gold,
+                FragmentReward       = frags
+            };
         }
 
         // ── Round end logic ───────────────────────────────────────────────

@@ -1,4 +1,5 @@
 using System;
+using Dystopia.Battle;
 using Dystopia.Core;
 
 namespace Dystopia.Events
@@ -9,6 +10,7 @@ namespace Dystopia.Events
         public static Action<BattleState>            OnStateChanged;
         public static Action<int>                    OnTurnStart;
         public static Action<string>                 OnBattleEnd;
+        public static Action<BattleResult>           OnBattleEnded;  // rich payload for result panel
 
         // ── Combat ────────────────────────────────────────────────────────
         public static Action<string, int>            OnDamageDealt;
@@ -34,6 +36,7 @@ namespace Dystopia.Events
             OnStateChanged     = null;
             OnTurnStart        = null;
             OnBattleEnd        = null;
+            OnBattleEnded      = null;
             OnDamageDealt      = null;
             OnHealApplied      = null;
             OnAbilityFired     = null;

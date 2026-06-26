@@ -15,6 +15,8 @@ namespace Dystopia.Cards
         public int            CurrentTier    { get; private set; } = 1;
         public ResonanceLevel resonanceLevel = ResonanceLevel.None;
         public int            duplicateCount = 0;
+        public string         PlayFabItemInstanceId;
+        public string         MarketCooldownUntil { get; set; }
 
         // ── IProgressable ─────────────────────────────────────────────────
         public TierLevel      Tier      => (TierLevel)CurrentTier;
@@ -173,6 +175,38 @@ namespace Dystopia.Cards
         public void AddDuplicate()
         {
             duplicateCount++;
+        }
+
+        public void LevelDown()
+        {
+            if (CurrentLevel > 1) { CurrentLevel--; Recalculate(); }
+        }
+
+        public void TierDown()
+        {
+            if (CurrentTier > 1) { CurrentTier--; Recalculate(); }
+        }
+
+        public void UndoResonance(ResonanceLevel previous, int dupesRestored)
+        {
+            resonanceLevel  = previous;
+            duplicateCount += dupesRestored;
+            Recalculate();
+        }
+
+        // ── Restore persisted state (called by CollectionService on login) ─
+        public void RestoreState(int level, int tier, ResonanceLevel resonance, int duplicates, string itemInstanceId)
+        {
+            CurrentLevel          = level;
+            CurrentTier           = tier;
+            resonanceLevel        = resonance;
+            duplicateCount        = duplicates;
+            PlayFabItemInstanceId = itemInstanceId;
+
+            if (resonanceLevel >= ResonanceLevel.R2 && data.ability != null)
+                data.ability.ApplyResonanceBoost();
+
+            Recalculate();
         }
     }
 }
