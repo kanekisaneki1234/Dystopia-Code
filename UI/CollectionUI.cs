@@ -157,6 +157,13 @@ namespace Dystopia.UI
 
         private void AddCardToGrid(CardInstance card)
         {
+            // Duplicate incoming — card is already displayed; just refresh its slot.
+            if (_cardObjects.TryGetValue(card, out var existing) && existing != null)
+            {
+                existing.GetComponent<CardSlotUI>()?.Configure(card);
+                return;
+            }
+
             var go = Instantiate(cardSlotPrefab, cardGridParent);
             go.GetComponent<CardSlotUI>().Configure(card);
 
@@ -191,13 +198,17 @@ namespace Dystopia.UI
         private void ApplyFilters()
         {
             var visible = new List<(CardInstance card, GameObject go)>();
+            var stale   = new List<CardInstance>();
 
             foreach (var (card, go) in _cardObjects)
             {
+                if (go == null) { stale.Add(card); continue; }
                 bool show = PassesFilter(card);
                 go.SetActive(show);
                 if (show) visible.Add((card, go));
             }
+
+            foreach (var card in stale) _cardObjects.Remove(card);
 
             // Sort and reorder siblings
             IOrderedEnumerable<(CardInstance card, GameObject go)> sorted = _sortMode switch
